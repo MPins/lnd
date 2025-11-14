@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -185,6 +186,13 @@ func Decode(invoice string, net *chaincfg.Params, opts ...DecodeOption) (
 		if err != nil {
 			return nil, fmt.Errorf("unable to deserialize "+
 				"signature: %v", err)
+		}
+		// Ensure the signature is in canonical low-S form.
+		sValue := new(big.Int).SetBytes(sigBase256[32:64])
+		halfOrder := new(big.Int).Rsh(btcec.S256().N, 1)
+		if sValue.Cmp(halfOrder) > 0 {
+			return nil, fmt.Errorf("signature is non-canonical " +
+				"(high-S)")
 		}
 		if !signature.Verify(hash, decodedInvoice.Destination) {
 			return nil, fmt.Errorf("invalid invoice signature")
